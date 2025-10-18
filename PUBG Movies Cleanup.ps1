@@ -34,8 +34,9 @@ foreach ($regPath in $registryKeys) {
                 $commonPath += "\"
             }
 
-            $moviesPath = Join-Path $commonPath "PUBG\TslGame\Content\Movies"
-            $moviesFolders += $moviesPath
+            # Target the Movies root so we catch all subfolders, including new ones
+            $moviesRootPath = Join-Path $commonPath "PUBG\TslGame\Content\Movies"
+            $moviesFolders += $moviesRootPath
         }
     }
 }
@@ -55,6 +56,7 @@ if ($moviesFolders.Count -eq 0) {
     $userInput = Read-Host "Paste the folder path to PUBG (it should end in ...\PUBG)"
 
     if ($userInput -and (Test-Path $userInput)) {
+        # Target the Movies root here as well
         $manualMoviesPath = Join-Path $userInput "TslGame\Content\Movies"
         $moviesFolders += $manualMoviesPath
     } else {
@@ -66,17 +68,21 @@ if ($moviesFolders.Count -eq 0) {
 # Remove duplicates
 $moviesFolders = $moviesFolders | Sort-Object -Unique
 
-# Delete files in Movies folders
+# Delete files in Movies folders, recursively
 foreach ($folder in $moviesFolders) {
     if (Test-Path $folder) {
-        foreach ($pattern in $deletePatterns) {
-            $files = Get-ChildItem -Path $folder -Filter $pattern -File -ErrorAction SilentlyContinue
-            foreach ($file in $files) {
-                try {
-                    Remove-Item $file.FullName -Force -ErrorAction Stop
-                    $deletedFiles += $file.FullName
-                } catch {}
-            }
+        try {
+            # Use -Recurse and -Include to find matching files anywhere under Movies
+            $files = Get-ChildItem -Path $folder -Recurse -File -ErrorAction SilentlyContinue -Include $deletePatterns
+        } catch {
+            $files = @()
+        }
+
+        foreach ($file in $files) {
+            try {
+                Remove-Item $file.FullName -Force -ErrorAction Stop
+                $deletedFiles += $file.FullName
+            } catch {}
         }
     }
 }
